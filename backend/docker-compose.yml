@@ -1,0 +1,50 @@
+version: "3.9"
+
+services:
+
+  db:
+    image: mysql:8-debian
+    container_name: my_new_sql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: 2000
+      MYSQL_DATABASE: student_portal
+      MYSQL_USER: joshuauser        # ← cannot be root
+      MYSQL_PASSWORD: 3000
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p2000"]
+      interval: 10s                 # ← no space between -p and password
+      timeout: 10s
+      retries: 20
+      start_period: 60s             # ← gives MySQL time to initialize
+
+  backend:
+    build: .
+    container_name: my_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 5000
+      DB_HOST: db                   # ← must be db not localhost
+      DB_PORT: 3306
+      DB_USER: joshuauser           # ← match MYSQL_USER above
+      DB_PASSWORD: 3000             # ← match MYSQL_PASSWORD above
+      DB_NAME: student_portal
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "5000:5000"
+
+volumes:
+  db_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/joshua/docker-volumes/student-portal-mysql
